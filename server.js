@@ -203,7 +203,61 @@ async function run() {
         });
       }
     });
+    app.patch("/requests/accept/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const request = await requestsCollection.findOne({
+          _id: new ObjectId(id),
+        });
 
+        if (!request) {
+          return res.status(404).send({
+            message: "Request not found",
+          });
+        }
+
+        await requestsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: "accepted" } },
+        );
+
+        await petsCollection.updateOne(
+          { _id: new ObjectId(request.petId) },
+          { $set: { adoptionStatus: "adopted" } },
+        );
+
+        await requestsCollection.updateMany(
+          {
+            petId: request.petId,
+            _id: { $ne: new ObjectId(id) },
+          },
+          { $set: { status: "rejected" } },
+        );
+
+        res.send({ success: true });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Failed to accept request",
+        });
+      }
+    });
+
+     app.patch("/requests/reject/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        await requestsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: "rejected" } },
+        );
+        res.send({ success: true });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Failed to reject request",
+        });
+      }
+    });
 
   } catch (error) {
     console.log(error);
