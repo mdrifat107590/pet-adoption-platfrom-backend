@@ -19,8 +19,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
-    console.log("MongoDB Connected Successfully");
+    
 
     const database = client.db("pawHavenDB");
     const petsCollection = database.collection("pets");
@@ -258,7 +257,20 @@ async function run() {
         });
       }
     });
-
+    app.delete("/requests/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await requestsCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to delete request",
+        });
+      }
+    });
+    await client.connect();
+    console.log("MongoDB Connected Successfully");
   } catch (error) {
     console.log(error);
   }
