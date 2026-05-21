@@ -114,6 +114,18 @@ async function run() {
         });
       }
     });
+    app.delete("/pets/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await petsCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to delete pet",
+        });
+      }
+    });
 
 
   } catch (error) {
