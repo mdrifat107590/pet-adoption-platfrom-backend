@@ -30,6 +30,50 @@ async function run() {
     app.get("/", (req, res) => {
       res.send("PawHaven Server Running...");
     });
+
+    app.get("/pets/featured", async (req, res) => {
+      try {
+        const result = await petsCollection.find({}).limit(6).toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch featured pets",
+        });
+      }
+    });
+    app.get("/pets", async (req, res) => {
+      try {
+        const search = req.query.search || "";
+        const species = req.query.species || "";
+        const email = req.query.email || "";
+        let query = {};
+
+        if (search) {
+          query.petName = {
+            $regex: search,
+            $options: "i",
+          };
+        }
+
+        if (species) {
+          query.species = species;
+        }
+
+        if (email) {
+          query.userEmail = email;
+        }
+
+        const result = await petsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Failed to fetch pets",
+        });
+      }
+    });
+
+    
   } catch (error) {
     console.log(error);
   }
