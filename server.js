@@ -84,7 +84,36 @@ async function run() {
         });
       }
     });
-    
+    app.post("/pets", verifyToken, async (req, res) => {
+      try {
+        const petData = req.body;
+        petData.createdAt = new Date();
+        petData.userEmail = req.user.email;
+        petData.adoptionStatus = "available";
+
+        const result = await petsCollection.insertOne(petData);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to add pet",
+        });
+      }
+    });
+    app.put("/pets/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedPet = req.body;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: updatedPet };
+
+        const result = await petsCollection.updateOne(query, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to update pet",
+        });
+      }
+    });
 
 
   } catch (error) {
