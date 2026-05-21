@@ -1,7 +1,9 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 dotenv.config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
@@ -9,6 +11,13 @@ const app = express();
 app.use(express.json());
 const port = process.env.PORT || 5000;
 const uri = process.env.MONGO_URI;
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: ["http://localhost:3000"],
+    credentials: true,
+  }),
+);
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -17,10 +26,33 @@ const client = new MongoClient(uri, {
   },
 });
 
+const verifyToken = (req, res, next) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).send({
+        message: "Unauthorized Access",
+      });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
+      if (error) {
+        return res.status(401).send({
+          message: "Invalid Token",
+        });
+      }
+      req.user = decoded;
+      next();
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: "Authorization Failed",
+    });
+  }
+};
+
 async function run() {
   try {
-    
-
     const database = client.db("pawHavenDB");
     const petsCollection = database.collection("pets");
     const requestsCollection = database.collection("requests");
@@ -242,7 +274,7 @@ async function run() {
       }
     });
 
-     app.patch("/requests/reject/:id", verifyToken, async (req, res) => {
+    app.patch("/requests/reject/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         await requestsCollection.updateOne(
@@ -269,6 +301,135 @@ async function run() {
         });
       }
     });
+
+    // authentication routes
+    app.post("/api/auth/register", async (req, res) => {
+      try {
+        const { name, email, password } = req.body;
+        const existingUser = await usersCollection.findOne({ email });
+
+        if (existingUser) {
+          return res.status(400).send({
+            message: "User already exists",
+          });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const userData = {
+          name,
+          email,
+          password: hashedPassword,
+          createdAt: new Date(),
+        };
+
+        const result = await usersCollection.insertOne(userData);
+        res.send({
+          success: true,
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Registration Failed",
+        });
+      }
+    });
+
+    app.post("/api/auth/login", async (req, res) => {
+      try {
+        const { email, password } = req.body;
+        const user = await usersCollection.findOne({ email });
+
+        if (!user) {
+          return res.status(400).send({
+            message: "Invalid Credentials",
+          });
+        }
+
+        const isMatched = await bcrypt.compare(password, user.password);
+        if (!isMatched) {
+          return res.status(400).send({
+            message: "Invalid Credentials",
+          });
+        }
+
+        const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, {
+          expiresIn: "7d",
+        });
+
+        res.cookie("token", token, {
+          httpOnly: true,
+          secure: false,
+          sameSite: "lax",
+        });
+
+        res.send({
+          success: true,
+          user: {
+            name: user.name,
+            email: user.email,
+          },
+        });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Login Failed",
+        });
+      }
+    });
+
+    app.post("/api/auth/logout", (req, res) => {
+      res.clearCookie("token");
+      res.send({
+        success: true,
+      });
+    });
+
+    app.post("/api/auth/google-login", async (req, res) => {
+      try {
+        const { name, email } = req.body;
+        let user = await usersCollection.findOne({ email });
+
+        if (!user) {
+          const userData = {
+            name,
+            email,
+            provider: "google",
+            createdAt: new Date(),
+          };
+
+          const result = await usersCollection.insertOne(userData);
+          user = {
+            _id: result.insertedId,
+            ...userData,
+          };
+        }
+
+        const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, {
+          expiresIn: "7d",
+        });
+
+        res.cookie("token", token, {
+          httpOnly: true,
+          secure: false,
+          sameSite: "lax",
+        });
+
+        res.send({
+          success: true,
+          user: {
+            name: user.name,
+            email: user.email,
+          },
+        });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Google Login Failed",
+        });
+      }
+    });
+
     await client.connect();
     console.log("MongoDB Connected Successfully");
   } catch (error) {
