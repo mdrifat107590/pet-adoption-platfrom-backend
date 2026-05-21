@@ -178,7 +178,18 @@ async function run() {
         });
       }
     });
-    
+    app.get("/requests", verifyToken, async (req, res) => {
+      try {
+        const result = await requestsCollection
+          .find({ userEmail: req.user.email })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch requests",
+        });
+      }
+    });
 
 
   } catch (error) {
