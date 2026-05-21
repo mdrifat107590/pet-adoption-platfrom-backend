@@ -127,6 +127,59 @@ async function run() {
       }
     });
 
+    // requets routes
+    app.post("/requests", verifyToken, async (req, res) => {
+      try {
+        const requestData = req.body;
+        const pet = await petsCollection.findOne({
+          _id: new ObjectId(requestData.petId),
+        });
+
+        if (!pet) {
+          return res.status(404).send({
+            message: "Pet not found",
+          });
+        }
+
+        if (pet.adoptionStatus === "adopted") {
+          return res.status(400).send({
+            message: "Pet already adopted",
+          });
+        }
+
+        if (pet.userEmail === req.user.email) {
+          return res.status(400).send({
+            message: "You cannot adopt your own pet",
+          });
+        }
+
+        const existingRequest = await requestsCollection.findOne({
+          petId: requestData.petId,
+          userEmail: req.user.email,
+        });
+
+        if (existingRequest) {
+          return res.status(400).send({
+            message: "You already requested this pet",
+          });
+        }
+
+        requestData.status = "pending";
+        requestData.createdAt = new Date();
+        requestData.userEmail = req.user.email;
+        requestData.ownerEmail = pet.userEmail;
+
+        const result = await requestsCollection.insertOne(requestData);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Failed to submit request",
+        });
+      }
+    });
+    
+
 
   } catch (error) {
     console.log(error);
