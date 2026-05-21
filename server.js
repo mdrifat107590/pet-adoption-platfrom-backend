@@ -191,6 +191,19 @@ async function run() {
       }
     });
 
+    app.get("/owner-requests", verifyToken, async (req, res) => {
+      try {
+        const result = await requestsCollection
+          .find({ ownerEmail: req.user.email })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch owner requests",
+        });
+      }
+    });
+
 
   } catch (error) {
     console.log(error);
