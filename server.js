@@ -72,8 +72,21 @@ async function run() {
         });
       }
     });
-
+    app.get("/pets/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await petsCollection.findOne(query);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch pet",
+        });
+      }
+    });
     
+
+
   } catch (error) {
     console.log(error);
   }
